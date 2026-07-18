@@ -1,19 +1,94 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import DashboardTopbar from "@/components/DashboardTopbar";
+import ImageUpload from "@/components/ImageUpload";
+import { createProperty } from "@/lib/api-client";
 
 const steps = ["Basic Info", "Location", "Pricing & Size", "Media & Amenities", "Review"];
 
 const inputClass = "w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink placeholder:text-ink/30 focus:border-primary";
 const labelClass = "mb-1.5 block text-xs font-medium uppercase tracking-wide text-ink/40";
 
+interface FormData {
+  title: string;
+  purpose: string;
+  type: string;
+  description: string;
+  city: string;
+  area: string;
+  address: string;
+  price: string;
+  size: string;
+  sizeUnit: string;
+  beds: string;
+  baths: string;
+  images: string[];
+  amenities: string[];
+}
+
 export default function NewProperty() {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [formData, setFormData] = useState<FormData>({
+    title: "",
+    purpose: "sale",
+    type: "house",
+    description: "",
+    city: "",
+    area: "",
+    address: "",
+    price: "",
+    size: "",
+    sizeUnit: "marla",
+    beds: "",
+    baths: "",
+    images: [],
+    amenities: [],
+  });
 
   const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
   const back = () => setStep((s) => Math.max(s - 1, 0));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (step < steps.length - 1) {
+      next();
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("title", formData.title);
+      form.append("purpose", formData.purpose);
+      form.append("type", formData.type);
+      form.append("description", formData.description);
+      form.append("city", formData.city);
+      form.append("area", formData.area);
+      form.append("address", formData.address);
+      form.append("price", formData.price);
+      form.append("size", formData.size);
+      form.append("sizeUnit", formData.sizeUnit);
+      form.append("beds", formData.beds || "0");
+      form.append("baths", formData.baths || "0");
+      form.append("images", JSON.stringify(formData.images));
+      form.append("amenities", JSON.stringify(formData.amenities));
+
+      const result = await createProperty(form);
+      setSubmitted(true);
+      setTimeout(() => router.push("/dashboard/properties"), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create property");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -52,29 +127,56 @@ export default function NewProperty() {
         ))}
       </div>
 
-      <form
-        onSubmit={(e) => { e.preventDefault(); if (step === steps.length - 1) setSubmitted(true); else next(); }}
-        className="max-w-2xl rounded-2xl border border-line bg-white p-8"
-      >
+      <form onSubmit={handleSubmit} className="max-w-2xl rounded-2xl border border-line bg-white p-8">
+        {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        
         {step === 0 && (
           <div className="space-y-5">
             <div>
               <label className={labelClass}>Listing Title</label>
-              <input className={inputClass} placeholder="e.g. 1 Kanal Modern House, DHA Phase 6" />
+              <input
+                required
+                className={inputClass}
+                placeholder="e.g. 1 Kanal Modern House, DHA Phase 6"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Purpose</label>
-                <select className={inputClass}><option>For Sale</option><option>For Rent</option></select>
+                <select
+                  className={inputClass}
+                  value={formData.purpose}
+                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                >
+                  <option value="sale">For Sale</option>
+                  <option value="rent">For Rent</option>
+                </select>
               </div>
               <div>
                 <label className={labelClass}>Property Type</label>
-                <select className={inputClass}><option>House</option><option>Plot / Land</option><option>Commercial</option><option>Apartment</option></select>
+                <select
+                  className={inputClass}
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                >
+                  <option value="house">House</option>
+                  <option value="plot">Plot / Land</option>
+                  <option value="commercial">Commercial</option>
+                  <option value="apartment">Apartment</option>
+                </select>
               </div>
             </div>
             <div>
               <label className={labelClass}>Description</label>
-              <textarea className={inputClass} rows={4} placeholder="Describe the property's condition, layout, and highlights" />
+              <textarea
+                className={inputClass}
+                rows={4}
+                placeholder="Describe the property's condition, layout, and highlights"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
             </div>
           </div>
         )}
@@ -84,16 +186,33 @@ export default function NewProperty() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>City</label>
-                <input className={inputClass} placeholder="Lahore" />
+                <input
+                  required
+                  className={inputClass}
+                  placeholder="Lahore"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                />
               </div>
               <div>
                 <label className={labelClass}>Area / Society</label>
-                <input className={inputClass} placeholder="DHA Phase 6" />
+                <input
+                  required
+                  className={inputClass}
+                  placeholder="DHA Phase 6"
+                  value={formData.area}
+                  onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                />
               </div>
             </div>
             <div>
               <label className={labelClass}>Full Address (optional, shown only to serious inquiries)</label>
-              <input className={inputClass} placeholder="Street / plot number" />
+              <input
+                className={inputClass}
+                placeholder="Street / plot number"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              />
             </div>
           </div>
         )}
@@ -103,24 +222,59 @@ export default function NewProperty() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Price (PKR)</label>
-                <input className={inputClass} placeholder="e.g. 45000000" type="number" />
+                <input
+                  required
+                  className={inputClass}
+                  placeholder="e.g. 45000000"
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                />
               </div>
               <div>
                 <label className={labelClass}>Size</label>
                 <div className="flex gap-2">
-                  <input className={inputClass} placeholder="1" type="number" />
-                  <select className={inputClass}><option>Marla</option><option>Kanal</option><option>Sq.ft</option><option>Acre</option></select>
+                  <input
+                    required
+                    className={inputClass}
+                    placeholder="1"
+                    type="number"
+                    value={formData.size}
+                    onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                  />
+                  <select
+                    className={inputClass}
+                    value={formData.sizeUnit}
+                    onChange={(e) => setFormData({ ...formData, sizeUnit: e.target.value })}
+                  >
+                    <option value="marla">Marla</option>
+                    <option value="kanal">Kanal</option>
+                    <option value="sqft">Sq.ft</option>
+                    <option value="acre">Acre</option>
+                  </select>
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Bedrooms</label>
-                <input className={inputClass} placeholder="e.g. 5" type="number" />
+                <input
+                  className={inputClass}
+                  placeholder="e.g. 5"
+                  type="number"
+                  value={formData.beds}
+                  onChange={(e) => setFormData({ ...formData, beds: e.target.value })}
+                />
               </div>
               <div>
                 <label className={labelClass}>Bathrooms</label>
-                <input className={inputClass} placeholder="e.g. 6" type="number" />
+                <input
+                  className={inputClass}
+                  placeholder="e.g. 6"
+                  type="number"
+                  value={formData.baths}
+                  onChange={(e) => setFormData({ ...formData, baths: e.target.value })}
+                />
               </div>
             </div>
           </div>
@@ -130,16 +284,33 @@ export default function NewProperty() {
           <div className="space-y-5">
             <div>
               <label className={labelClass}>Photos</label>
-              <div className="rounded-lg border-2 border-dashed border-line bg-paper p-8 text-center text-sm text-ink/40">
-                Drag photos here, or click to upload (JPG/PNG, up to 10 images)
-              </div>
+              <ImageUpload
+                multiple
+                onImageAdded={(url) => setFormData({ ...formData, images: [...formData.images, url] })}
+                onError={(err) => setError(err)}
+              />
             </div>
             <div>
               <label className={labelClass}>Amenities</label>
               <div className="flex flex-wrap gap-2">
                 {["Parking", "Backup Generator", "Security", "Servant Quarters", "Basement", "Solar Panels", "Furnished"].map((a) => (
-                  <label key={a} className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink/60 has-[:checked]:border-primary has-[:checked]:bg-primary-light has-[:checked]:text-primary-dark">
-                    <input type="checkbox" className="accent-primary" /> {a}
+                  <label
+                    key={a}
+                    className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink/60 has-[:checked]:border-primary has-[:checked]:bg-primary-light has-[:checked]:text-primary-dark cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-primary"
+                      checked={formData.amenities.includes(a)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({ ...formData, amenities: [...formData.amenities, a] });
+                        } else {
+                          setFormData({ ...formData, amenities: formData.amenities.filter((am) => am !== a) });
+                        }
+                      }}
+                    />
+                    {a}
                   </label>
                 ))}
               </div>
@@ -161,8 +332,12 @@ export default function NewProperty() {
           <button type="button" onClick={back} disabled={step === 0} className="text-sm font-medium text-ink/50 disabled:opacity-30">
             ← Back
           </button>
-          <button type="submit" className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">
-            {step === steps.length - 1 ? "Submit Listing" : "Continue"}
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
+          >
+            {loading ? "Submitting..." : step === steps.length - 1 ? "Submit Listing" : "Continue"}
           </button>
         </div>
       </form>
